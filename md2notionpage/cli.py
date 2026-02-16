@@ -1,7 +1,7 @@
-
 import argparse
 import os
 import sys
+import json
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -17,6 +17,10 @@ def main():
     parser.add_argument('--cover_url', type=str, default='', help='Cover URL for the Notion page (optional).')
     parser.add_argument('--parent_type', type=str.lower, choices=['page', 'database'], default='page', help='"page" or "database"')
     parser.add_argument('--print_page_info', action='store_true', help='Print info about the newly created page')
+    
+    # Custom Property Arguments
+    parser.add_argument('--prop', action='append', help='Custom property in "Key:Value" format. Defaults to rich_text. Repeatable.')
+    parser.add_argument('--props_json', type=str, help='JSON string containing a dictionary of properties to merge.')
 
     args = parser.parse_args()
 
@@ -43,9 +47,56 @@ def main():
         # If title is not given, take it from the file base name
         title = args.title if args.title else os.path.splitext(os.path.basename(args.markdown_file))[0]
 
+        # ---------------------------------------------------------
+        # Build Property Dictionary
+        # ---------------------------------------------------------
+        notion_properties = {}
+
+        # 1. If title is explicitly given in args, initiate structure with it.
+        #    If not, we start empty (as requested).
+        if args.title:
+            notion_properties[args.title_property_name] = {
+                "title": [{"text": {"content": args.title}}]
+            }
+
+        # 2. Merge --props_json if provided
+        if args.props_json:
+            try:
+                json_props = json.loads(args.props_json)
+                if isinstance(json_props, dict):
+                    notion_properties.update(json_props)
+                else:
+                    print("⚠️ Warning: --props_json must be a valid JSON dictionary. Ignoring.")
+            except json.JSONDecodeError as e:
+                print(f"⚠️ Warning: Failed to parse --props_json: {e}. Ignoring.")
+
+        # 3. Merge --prop flags (Key:Value)
+        #    These override previous keys if they conflict.
+        if args.prop:
+            for p in args.prop:
+                if ':' in p:
+                    key, value = p.split(':', 1)
+                    # We default simple Key:Value pairs to 'rich_text' objects for safety
+                    # Users needing 'select' or 'date' should use --props_json
+                    notion_properties[key] = {
+                        "rich_text": [{"text": {"content": value}}]
+                    }
+                else:
+                    print(f"⚠️ Warning: Invalid format for --prop '{p}'. Expected 'Key:Value'. Ignoring.")
+
+        # ---------------------------------------------------------
+
         # Create the Notion page
-        notion_page_url = md2notionpage(markdown_content, title, parent_page_id, cover_url=args.cover_url, parent_type=args.parent_type, 
-                                        print_page_info=args.print_page_info, title_property_name=args.title_property_name)
+        notion_page_url = md2notionpage(
+            markdown_content, 
+            title, 
+            parent_page_id, 
+            cover_url=args.cover_url, 
+            parent_type=args.parent_type, 
+            properties=notion_properties, 
+            print_page_info=args.print_page_info, 
+            title_property_name=args.title_property_name
+        )
         print(f'Notion page created: {notion_page_url}')
 
     except APIResponseError as e:
