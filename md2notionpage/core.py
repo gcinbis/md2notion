@@ -14,7 +14,7 @@ Dependencies:
     - mistune: Markdown parser.
     - re: Regular expressions module.
     - os: Operating system interfaces module.
-    - json: JSON encoder and decoder module.
+    - pprint: Pretty-printing library for formatted output of Python data structures.
 
 Environment Variables:
     - NOTION_SECRET: Authentication token for the Notion API.
