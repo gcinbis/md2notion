@@ -1,12 +1,6 @@
 from md2notionpage.core import parse_markdown_to_notion_blocks
 import json
 
-markdown_OK = """# Otsikko 1
-- Ensimmäinen kohta
-buggy
- - Alaluettelo
-"""
-
 markdown_buggy = """# Otsikko 1
 - Ensimmäinen kohta
 buggy
