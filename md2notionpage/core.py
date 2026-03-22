@@ -639,16 +639,21 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
     else:
         raise ValueError(f"Unrecognized parent_type: {parent_type!r}. Expected 'page' or 'database'.")
 
-    update_props = {
-        "title": {
-            "title": [{"type": "text", "text": {"content": title}}]
+    update_payload = {}
+    
+    if parent_type == 'page':
+        update_props = {
+            "title": {
+                "title": [{"type": "text", "text": {"content": title}}]
+            }
         }
-    }
-    update_payload = {"properties": update_props}
+        update_payload["properties"] = update_props
+
     if cover_url:
         update_payload["cover"] = {"external": {"url": cover_url}}
     
-    notion.pages.update(created_page["id"], **update_payload)
+    if update_payload:
+        notion.pages.update(created_page["id"], **update_payload)
 
     final_blocks = []
     for block in parse_md(markdown_text):
