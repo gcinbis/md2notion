@@ -568,6 +568,53 @@ def split_rich_text(rich_text_list, max_len=2000):
         chunks.append(current)
     return chunks
 
+def append_md_to_notion_block(markdown_text, block_id, print_page_info=False):
+    global notion
+    if notion is None:
+        notion = Client(auth=environ.get("NOTION_SECRET"))
+
+    final_blocks = []
+    for block in parse_md(markdown_text):
+        block_type = block.get("type")
+        if block_type in ("paragraph", "heading_1", "heading_2", "heading_3", "quote", "bulleted_list_item", "numbered_list_item", "to_do"):
+            rich_text_list = block[block_type].get("rich_text", [])
+            total_visible = sum(
+                len(
+                    rt.get("text", {}).get("content", "")
+                    if rt.get("type") == "text"
+                    else rt.get("equation", {}).get("expression", "")
+                    if rt.get("type") == "equation"
+                    else rt.get("plain_text", "")
+                )
+                for rt in rich_text_list
+            )
+
+            if total_visible > 2000:
+                chunks = split_rich_text(rich_text_list, 2000)
+                for rich_chunk in chunks:
+                    new_block = deepcopy(block)
+                    new_block[block_type]["rich_text"] = rich_chunk
+                    final_blocks.append(new_block)
+                continue
+        final_blocks.append(block)
+
+    batch = []
+    for block in final_blocks:
+        if "object" not in block:
+            block["object"] = "block"
+        batch.append(block)
+        if len(batch) == 100:
+            notion.blocks.children.append(block_id, children=batch)
+            batch = []
+
+    if batch:
+        notion.blocks.children.append(block_id, children=batch)
+
+    if print_page_info:
+        print(f"Appended smoothly to block {block_id}")
+
+    return f"https://notion.so/{block_id}"
+
 def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='', parent_type='page', properties=None, title_property_name='Name', print_page_info=False):
     global notion
     if notion is None:
