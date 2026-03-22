@@ -14,7 +14,7 @@ requires-python = ">=3.7"
 dependencies = [
     "notion-client",
     "python-dotenv",
-    "mistune",
+    "mistune>=3,<4",
 ]
 
 [project.scripts]
