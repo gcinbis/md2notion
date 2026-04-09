@@ -414,16 +414,25 @@ class NotionBlockConverter:
                     text += child['raw']
                 elif 'children' in child:
                     text += get_cell_text(child)
-            return text.strip()
+            text = text.strip()
+            # Strip markdown footnote references like [^18] — they have no LaTeX equivalent
+            text = re.sub(r'\[\^[^\]]*\]', '', text)
+            # Escape characters that are special in KaTeX but literal in table cell text
+            text = re.sub(r'(?<!\\)\$', r'\\$', text)
+            text = re.sub(r'(?<!\\)\^', r'\\^{}', text)
+            text = re.sub(r'(?<!\\)_', r'\\_', text)
+            return text
 
+        # table_head children are table_cell tokens directly (no table_row wrapper)
         if header:
-            for row in header.get('children', []):
-                cells = []
-                for cell in row.get('children', []):
-                    txt = get_cell_text(cell)
-                    cells.append(f"\\textsf{{\\textbf{{{txt}}}}}")
+            cells = []
+            for cell in header.get('children', []):
+                txt = get_cell_text(cell)
+                cells.append(f"\\textsf{{\\textbf{{{txt}}}}}")
+            if cells:
                 latex_rows.append(" & ".join(cells) + " \\\\\\hline")
 
+        # table_body children are table_row tokens, each containing table_cell tokens
         if body:
             for row in body.get('children', []):
                 cells = []
@@ -437,13 +446,13 @@ class NotionBlockConverter:
 
         col_count = 0
         if header and header.get('children'):
-            col_count = len(header['children'][0].get('children', []))
+            col_count = len(header.get('children', []))
         elif body and body.get('children'):
             col_count = len(body['children'][0].get('children', []))
         
-        table_column = "|c" * col_count
+        table_column = "|l" * col_count
         table_content = "\n".join(latex_rows)
-        return f"\\def\\arraystretch{{1.4}}\\begin{{array}}{{{table_column}|}}\\hline\n{table_content}\\end{{array}}"
+        return f"\\begin{{array}}{{{table_column}|}}\\hline\n{table_content}\\end{{array}}"
 
 # --- Replacement Functions ---
 

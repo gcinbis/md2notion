@@ -319,5 +319,60 @@ print("Hello")
         )
         self.assertEqual(url, "https://notion.so/custom-title")
 
+class TestTableToLatex(unittest.TestCase):
+    """Tests for convert_table_token_to_latex, covering KaTeX compatibility fixes."""
+
+    def _parse_table_md(self, markdown):
+        from md2notionpage.core import NotionBlockConverter
+        converter = NotionBlockConverter()
+        blocks = converter.parse(markdown)
+        eq_blocks = [b for b in blocks if b.get('type') == 'equation']
+        self.assertEqual(len(eq_blocks), 1, "Expected exactly one equation block from table")
+        return eq_blocks[0]['equation']['expression']
+
+    def test_dollar_sign_in_cell_is_escaped(self):
+        """Bare $ in a table cell must be escaped as \\$ to avoid KaTeX parse errors."""
+        md = (
+            "| Tool | MRR |\n"
+            "|------|-----|\n"
+            "| Copy to Notion | ~$100 MRR |\n"
+        )
+        expr = self._parse_table_md(md)
+        self.assertIn(r'\$', expr, "Expected \\$ in LaTeX output")
+        self.assertNotIn(r'~$1', expr, "Bare $ should have been escaped")
+
+    def test_no_arraystretch_in_output(self):
+        """`\\def\\arraystretch` is not supported by Notion's KaTeX and must not appear."""
+        md = (
+            "| A | B |\n"
+            "|---|---|\n"
+            "| 1 | 2 |\n"
+        )
+        expr = self._parse_table_md(md)
+        self.assertNotIn(r'\def\arraystretch', expr)
+
+    def test_footnote_reference_in_cell_is_stripped(self):
+        """[^N] footnote refs must be stripped — bare ^ breaks KaTeX superscript parsing."""
+        md = (
+            "| Tool | Notes |\n"
+            "|------|-------|\n"
+            "| foo  | bar [^18] |\n"
+        )
+        expr = self._parse_table_md(md)
+        self.assertNotIn('[^', expr, "Footnote reference should be stripped from LaTeX")
+        self.assertNotIn('^1', expr, "Bare ^ should not remain in LaTeX output")
+
+    def test_column_spec_matches_column_count(self):
+        """Column spec must declare all columns (5 |l| entries for a 5-column table)."""
+        md = (
+            "| A | B | C | D | E |\n"
+            "|---|---|---|---|---|\n"
+            "| 1 | 2 | 3 | 4 | 5 |\n"
+        )
+        expr = self._parse_table_md(md)
+        # 5 columns → {|l|l|l|l|l|}
+        self.assertIn('{|l|l|l|l|l|}', expr)
+
+
 if __name__ == '__main__':
     unittest.main()
