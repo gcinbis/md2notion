@@ -240,14 +240,7 @@ class NotionBlockConverter:
             }
 
         elif token_type == 'table':
-            latex_table = self.convert_table_token_to_latex(token)
-            return {
-                "object": "block",
-                "type": "equation",
-                "equation": {
-                    "expression": latex_table
-                }
-            }
+            return self.convert_table_token_to_notion(token)
 
         elif token_type == 'image':
             return {
@@ -453,6 +446,70 @@ class NotionBlockConverter:
         table_column = "|l" * col_count
         table_content = "\n".join(latex_rows)
         return f"\\begin{{array}}{{{table_column}|}}\\hline\n{table_content}\\end{{array}}"
+
+    def convert_table_token_to_notion(self, token):
+        header = None
+        body = None
+        for child in token.get('children', []):
+            if child['type'] == 'table_head':
+                header = child
+            elif child['type'] == 'table_body':
+                body = child
+
+        col_count = 0
+        if header and header.get('children'):
+            col_count = len(header.get('children', []))
+        elif body and body.get('children'):
+            col_count = len(body['children'][0].get('children', []))
+
+        if col_count == 0:
+            return None
+
+        table_rows = []
+
+        if header:
+            header_cells = []
+            for cell in header.get('children', []):
+                header_cells.append(self.render_inlines(cell.get('children', [])))
+            while len(header_cells) < col_count:
+                header_cells.append([])
+            header_cells = header_cells[:col_count]
+
+            table_rows.append({
+                "object": "block",
+                "type": "table_row",
+                "table_row": {
+                    "cells": header_cells
+                }
+            })
+
+        if body:
+            for row in body.get('children', []):
+                row_cells = []
+                for cell in row.get('children', []):
+                    row_cells.append(self.render_inlines(cell.get('children', [])))
+                while len(row_cells) < col_count:
+                    row_cells.append([])
+                row_cells = row_cells[:col_count]
+
+                table_rows.append({
+                    "object": "block",
+                    "type": "table_row",
+                    "table_row": {
+                        "cells": row_cells
+                    }
+                })
+
+        return {
+            "object": "block",
+            "type": "table",
+            "table": {
+                "table_width": col_count,
+                "has_column_header": True if header else False,
+                "has_row_header": False,
+                "children": table_rows
+            }
+        }
 
 # --- Replacement Functions ---
 
