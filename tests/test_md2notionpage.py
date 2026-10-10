@@ -508,6 +508,10 @@ class TestLatexDisplayMath(unittest.TestCase):
         self.assertEqual([b['type'] for b in blocks], ['paragraph', 'equation', 'paragraph'])
         self.assertEqual(blocks[1]['equation']['expression'], r"x_t=(1-t)\epsilon")
 
+    def test_multiline_bracket_display_math_in_quote(self):
+        blocks = self._parse("> \\[\n> x_t\n> \\]")
+        self.assertEqual(blocks[0]['quote']['rich_text'][0]['equation']['expression'], "x_t")
+
     def test_code_is_untouched(self):
         blocks = self._parse("```\n\\[ fenced \\]\n```")
         self.assertEqual(blocks[0]['code']['rich_text'][0]['text']['content'], "\\[ fenced \\]")

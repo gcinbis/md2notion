@@ -63,7 +63,15 @@ def normalize_latex_delimiters(markdown):
 
 
 def _convert_math(text):
-    text = _DISPLAY_MATH_RE.sub(lambda m: '$$' + m.group(1).strip() + '$$', text)
+    def display(m):
+        lines = m.group(1).split('\n')
+        # Inside a blockquote, continuation lines carry "> " markers that are not part of the math
+        line_start = text.rfind('\n', 0, m.start()) + 1
+        if text[line_start:m.start()].lstrip().startswith('>'):
+            lines = [lines[0]] + [re.sub(r'^[ \t]*(?:>[ \t]?)*', '', l) for l in lines[1:]]
+        return '$$' + ' '.join(l.strip() for l in lines if l.strip()) + '$$'
+
+    text = _DISPLAY_MATH_RE.sub(display, text)
     return _INLINE_MATH_RE.sub(lambda m: '$' + m.group(1).strip() + '$', text)
 
 
